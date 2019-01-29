@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8"/>
+<head>
+
+
+<link href="https://fonts.googleapis.com/css?family=Armata" rel="stylesheet"/>
+<link href="http://fonts.googleapis.com/css?family=Lato:400,700" rel="stylesheet" type="text/css"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+
+<style>
+
+
+svg {
+    background: #303030;
+  }
+
+text {
+
+  opacity: 0.95;
+}
+
+rect {
+  fill: transparent;
+  shape-rendering: crispEdges;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.1);
+  shape-rendering: crispEdges;
+}
+
+.axisLine {
+  fill: none;
+  shape-rendering: crispEdges;
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 2px;
+}
+
+.dot {
+  fill-opacity: .5;
+}
+
+
+path {
+  fill: #303030;
+  stroke: #fef;
+  stroke-width: 0.5px;
+}
+
+.textLabels {
+
+  text-transform: lowercase;
+  fill: white;
+  font-family: 'Armata';font-size: 3px;
+
+   }
+
+text {
+
+  fill: white;
+}
+
+text.label {
+
+  font-family: 'Armata';
+  fill: white;
+}
+
+
+    </style>
+</head>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+
+
+<body>
+<div>
+<div class="container" style="display: inline-block; transform: translate(0px, -60px)">
+<br/><br/><br/><br/>
+<div id="scatter" style="transform: translate(0px, -10px); display: inline-block"></div>
+</div>
+<script type="text/javascript">
+
+  var svg;
+  var objects;
+
+var margin = { top: 50, right: 100, bottom: 150, left: 250 },
+    outerWidth = 10000,
+    outerHeight = 8000,
+    width = outerWidth - margin.left - margin.right,
+    height = outerHeight - margin.top - margin.bottom;
+
+var x = d3.scaleLinear()
+    .range([0, width]).nice();
+
+var y = d3.scaleLinear()
+    .range([height, 0]).nice();
+
+var xCat = "X",
+    yCat = "Y",
+    colorCat = "labels";
+
+  svg = d3.select("#scatter")
+      .append("svg")
+      .attr("width", outerWidth)
+      .attr("height", outerHeight)
+
+      svg.append("rect")
+      .attr("width", width)
+      .attr("height", height);
+
+  var g = svg
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+ var zoom = d3.zoom().on("zoom", function () {
+
+    g.attr("transform", d3.event.transform)
+
+ })
+
+svg.call(zoom).call(zoom.transform, d3.zoomIdentity.translate(7838.618899345176, 52.24614299372922).scale(0.12430877108415189));
+
+var valueline = d3.line()
+      .x(function(d) { return d[0]; })
+      .y(function(d) { return d[1]; })
+      .curve(d3.curveCatmullRomClosed),
+      paths,
+      groups,
+      groupIds,
+      scaleFactor = 1.25,
+      polygon,
+      centroid,
+      node,
+      link,
+      curveTypes = ['curveBasisClosed', 'curveCardinalClosed', 'curveCatmullRomClosed', 'curveLinearClosed'],
+      simulation = d3.forceSimulation()
+        .force('link', d3.forceLink().id(function(d) { return d.labels; }))
+        .force('charge', d3.forceManyBody())
+        .force('center', d3.forceCenter(width / 2, height / 2));
+
+d3.csv("data.csv", function(data) {
+  data.forEach(function(d) {
+    d.X = +d.X;
+    d.Y = +d.Y;
+    d.labels = +d.labels;
+
+  });
+
+
+   // count members of each group. Groups with less
+  // than 3 member will not be considered (creating
+  // a convex hull need 3 points at least)
+  groupIds = d3.set(data.map(function(n) { return +n.labels; }))
+    .values()
+    .map( function(groupId) {
+      return { 
+        groupId : groupId,
+        count : data.filter(function(n) { return +n.labels == groupId; }).length
+      };
+    })
+    .filter( function(group) { return group.count > 2;})
+    .map( function(group) { return group.groupId; });
+
+   var fill = d3.scaleOrdinal()
+      .domain([0, 1])
+      .range(['#ffffe0','#91F3E0','#C2F8A1','#FFF1D2','#D4ABFF','#b81b34','#8b0000'])
+
+  var xMax = d3.max(data, function(d) { return d[xCat]; }) * 1.05,
+      xMin = d3.min(data, function(d) { return d[xCat]; }),
+      xMin = xMin > 0 ? 0 : xMin,
+      yMax = d3.max(data, function(d) { return d[yCat]; }) * 1.05,
+      yMin = d3.min(data, function(d) { return d[yCat]; }),
+      yMin = yMin > 0 ? 0 : yMin;
+
+  x.domain([xMin, xMax]);
+  y.domain([yMin, yMax]);
+
+  var xAxis = d3.axisBottom()
+      .scale(x);
+
+  var yAxis = d3.axisLeft()
+      .scale(y);
+
+  objects = g.append("svg")
+      .classed("objects", true)
+      .attr("width", width)
+      .attr("height", height);
+
+  paths = objects.selectAll('.path_placeholder')
+    .data(groupIds, function(d) { return +d; })
+    .enter()
+    .append('g')
+    .attr('class', 'path_placeholder')
+    .append('path')
+    .attr("class", "encase")
+    .attr("id", function(d) { return "path_" + d;});
+
+ var texts =  objects.selectAll(".dot")
+      .data(data)
+    .enter().append("text")
+      .attr("class", "textLabels")
+      .style("fill", "white")
+      .style("opacity", 0.95)
+      .attr("pointer-events" , "all")
+      .attr("transform", transform)
+      .style("font-size", function(d) { return (d.value * 5000) })
+      .text(function(d) { return d.text_reference; })
+
+   simulation
+      .nodes(data)
+      .on('tick', ticked);
+
+
+ paths.on("click",  function(d) {
+
+   highlightDummy = 1;
+
+   var cluster = d;
+
+   console.log(d)
+
+   d3.selectAll(".textLabels").transition().duration(500).attr("font-size", function(d) {return ((d.labels == cluster ?  d.value * 200 : 0.0)) });
+
+    });
+
+  d3.selectAll(".textLabels").on("mouseout.text", function(d) {
+
+    var selectedGroup = d.labels;
+
+      setTimeout(function() {
+
+      d3.selectAll('.textLabels').transition(1000).ease(d3.easeLinear).style("opacity", 1.0)
+
+}, 8000);
+
+})
+
+   //SCROLL TO VIEW
+
+  $(".objects").get(0).scrollIntoView();
+
+   //SCROLL TO VIEW
+
+  function ticked() {
+    
+    updateGroups();
+
+  }
+
+  // select nodes of the group, retrieve its positions
+// and return the convex hull of the specified points
+// (3 points as minimum, otherwise returns null)
+var polygonGenerator = function(groupId) {
+  var node_coords = texts
+    .filter(function(d) { return d.labels == parseInt(groupId); })
+    .data()
+    .map(function(d) { return [d.X, d.Y]; });
+    
+  return d3.polygonHull(node_coords);
+};
+function updateGroups() {
+  groupIds.forEach(function(groupId) {
+
+    if (groupId != -1) {
+
+    var path = paths.filter(function(d) { return d == parseInt(groupId);})
+      .attr('transform', 'scale(1) translate(0,0)')
+      .attr('d', function(d) {
+
+
+        polygon = polygonGenerator(d);          
+        centroid = d3.polygonCentroid(polygon);
+        // to scale the shape properly around its points:
+        // move the 'g' element to the centroid point, translate
+        // all the path around the center of the 'g' and then
+        // we can scale the 'g' element properly
+        return valueline(
+          polygon.map(function(point) {
+            return [  x(point[0]) - x(centroid[0]), y(point[1]) - y(centroid[1]) ];
+          })
+        );
+      });
+    d3.select(path.node().parentNode).attr('transform', 'translate('  + x(centroid[0]) + ',' + y(centroid[1]) + ') scale(' + scaleFactor + ')');
+  } else {
+
+  }
+  });
+}
+
+  function zoom() {
+    svg.select(".x.axis").call(xAxis);
+    svg.select(".y.axis").call(yAxis);
+
+    svg.selectAll(".dot")
+        .attr("transform", transform);
+  }
+
+  function transform(d) {
+    return "translate(" + x(d[xCat]) + "," + y(d[yCat]) + ")";
+  }
+
+});
+
+
+
+
+    </script>
+</div></body>
